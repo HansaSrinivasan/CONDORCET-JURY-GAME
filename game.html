@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if game %}Game Details{% else %}New Game{% endif %} - Condorcet Jury Game
+{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/game.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="game-section">
+    <div class="container">
+        {% if game %}
+        <!-- Game details view for existing game -->
+        <div class="game-details-view">
+            <div class="game-header">
+                <h1>{{ game.name }}</h1>
+                <div class="game-meta">
+                    <span class="game-date">{{ game.created_at.strftime('%B %d, %Y at %H:%M') }}</span>
+                    <span class="game-judges">{{ game.judge_count }} Judges</span>
+                </div>
+            </div>
+            
+            <div class="verdict-display">
+                <div class="verdict-box {{ game.verdict }}">
+                    <div class="verdict-label">Majority Verdict</div>
+                    <div class="verdict-value">{{ game.verdict|upper }}</div>
+                </div>
+                <div class="verdict-probability">
+                    <div class="probability-circle">
+                        <svg width="150" height="150" viewBox="0 0 150 150">
+                            <circle cx="75" cy="75" r="60" fill="none" stroke="#e2e8f0" stroke-width="15"/>
+                            <circle cx="75" cy="75" r="60" fill="none" stroke="#4f46e5" stroke-width="15" 
+                                stroke-dasharray="377" stroke-dashoffset="{{ (377 * (1 - game.correct_probability))| int }}" 
+                                transform="rotate(-90 75 75)"/>
+                            <text x="75" y="75" text-anchor="middle" dy="7" font-size="24" font-weight="bold">
+                                {{ (game.correct_probability * 100)|int }}%
+                            </text>
+                        </svg>
+                    </div>
+                    <div class="probability-label">Probability of Correctness</div>
+                </div>
+            </div>
+            
+            <div class="game-chart">
+                <h2>Judge Probabilities</h2>
+                <div class="chart-container">
+                    <canvas id="judgeChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="judge-list">
+                <h2>Judge Details</h2>
+                <table class="judge-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Vote</th>
+                            <th>Probability</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for judge in game.judges %}
+                        <tr>
+                            <td>{{ judge.name }}</td>
+                            <td class="vote {{ judge.vote }}">{{ judge.vote|upper }}</td>
+                            <td>{{ (judge.probability * 100)|int }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="game-actions">
+                <a href="{{ url_for('game.home') }}" class="btn btn-secondary">Back to Home</a>
+                <a href="{{ url_for('game.new_game') }}" class="btn btn-primary">Start New Game</a>
+            </div>
+        </div>
+        {% else %}
+        <!-- New game interface -->
+        <div class="game-wizard" id="gameWizard">
+            <div class="wizard-header">
+                <h1>New Condorcet Jury Game</h1>
+                <div class="steps-indicator">
+                    <div class="step active" data-step="1">1. Judge Count</div>
+                    <div class="step" data-step="2">2. Judge Details</div>
+                    <div class="step" data-step="3">3. Results</div>
+                </div>
+            </div>
+            
+            <div class="wizard-content">
+                <!-- Step 1: Judge Count -->
+                <div class="wizard-step active" id="step1">
+                    <h2>How many judges would you like in your simulation?</h2>
+                    <p class="step-description">Choose an odd number of judges to avoid ties.</p>
+                    
+                    <div class="judge-counter">
+                        <button class="counter-btn" id="decreaseBtn">-</button>
+                        <input type="number" id="judgeCount" min="3" max="99" value="3" step="2">
+                        <button class="counter-btn" id="increaseBtn">+</button>
+                    </div>
+                </div>
+                
+                <!-- Step 2: Judge Details -->
+                <div class="wizard-step" id="step2">
+                    <h2>Enter Judge Details</h2>
+                    <p class="step-description">For each judge, enter a name, select a vote, and set their probability of correctness.</p>
+                    
+                    <div class="judge-forms" id="judgeForms">
+                        <!-- Judge forms will be generated here -->
+                    </div>
+                </div>
+                
+                <!-- Step 3: Results -->
+                <div class="wizard-step" id="step3">
+                    <h2>Game Results</h2>
+                    
+                    <div class="results-container">
+                        <div class="verdict-display">
+                            <div class="verdict-box" id="verdictBox">
+                                <div class="verdict-label">Majority Verdict</div>
+                                <div class="verdict-value" id="verdictValue">--</div>
+                            </div>
+                            <div class="verdict-probability">
+                                <div class="probability-circle">
+                                    <svg width="150" height="150" viewBox="0 0 150 150">
+                                        <circle cx="75" cy="75" r="60" fill="none" stroke="#e2e8f0" stroke-width="15"/>
+                                        <circle id="probabilityCircle" cx="75" cy="75" r="60" fill="none" stroke="#4f46e5" stroke-width="15" 
+                                            stroke-dasharray="377" stroke-dashoffset="377" transform="rotate(-90 75 75)"/>
+                                        <text id="probabilityText" x="75" y="75" text-anchor="middle" dy="7" font-size="24" font-weight="bold">
+                                            0%
+                                        </text>
+                                    </svg>
+                                </div>
+                                <div class="probability-label">Probability of Correctness</div>
+                            </div>
+                        </div>
+                        
+                        <div class="results-chart">
+                            <div class="chart-container">
+                                <canvas id="resultsChart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="results-stats">
+                            <div class="stat-box">
+                                <div class="stat-value" id="judgeTotalCount">0</div>
+                                <div class="stat-label">Total Judges</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="convictCount">0</div>
+                                <div class="stat-label">Convict Votes</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="acquitCount">0</div>
+                                <div class="stat-label">Acquit Votes</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="averageProbability">0%</div>
+                                <div class="stat-label">Avg. Probability</div>
+                            </div>
+                        </div>
+                        
+                        <div class="save-game">
+                            <h3>Save This Game</h3>
+                            <div class="form-group">
+                                <label for="gameName">Game Name:</label>
+                                <input type="text" id="gameName" required>
+                            </div>
+                            <button id="saveGameBtn" class="btn btn-primary">Save Game</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="wizard-navigation">
+                <button id="prevBtn" class="btn btn-secondary" disabled>Previous</button>
+                <button id="nextBtn" class="btn btn-primary">Next</button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script src="{{ url_for('static', filename='js/game.js') }}"></script>
+{% if game %}
+<script>
+    // Initialize the chart for existing game
+    document.addEventListener('DOMContentLoaded', function() {
+        const judges = {{ game.judges|tojson }};
+        
+        // Sort judges by probability for better visualization
+        judges.sort((a, b) => b.probability - a.probability);
+        
+        // Prepare data for chart
+        const judgeNames = judges.map(judge => judge.name);
+        const probabilities = judges.map(judge => judge.probability);
+        const backgroundColors = judges.map(judge => 
+            judge.vote === 'convict' ? 'rgba(220, 38, 38, 0.7)' : 'rgba(5, 150, 105, 0.7)'
+        );
+        const borderColors = judges.map(judge => 
+            judge.vote === 'convict' ? 'rgb(220, 38, 38)' : 'rgb(5, 150, 105)'
+        );
+        
+        // Create chart
+        const ctx = document.getElementById('judgeChart').getContext('2d');
+        const judgeChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: judgeNames,
+                datasets: [{
+                    label: 'Probability of Correctness',
+                    data: probabilities,
+                    backgroundColor: backgroundColors,
+                    borderColor: borderColors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 1,
+                        ticks: {
+                            callback: function(value) {
+                                return (value * 100) + '%';
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Probability'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            autoSkip: true,
+                            maxTicksLimit: 15
+                        },
+                        title: {
+                            display: true,
+                            text: 'Judge'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const judge = judges[context.dataIndex];
+                                return [
+                                    `Probability: ${Math.round(judge.probability * 100)}%`,
+                                    `Vote: ${judge.vote.toUpperCase()}`
+                                ];
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endif %}
+{% endblock %}

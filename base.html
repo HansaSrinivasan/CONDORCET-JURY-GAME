@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Condorcet Jury Game{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    {% block styles %}{% endblock %}
+</head>
+<body>
+    <header class="main-header">
+        <div class="container">
+            <a href="{{ url_for('game.home') }}" class="logo">Condorcet Jury Game</a>
+            <nav class="main-nav">
+                {% if current_user.is_authenticated %}
+                <ul class="nav-list">
+                    <li><a href="{{ url_for('game.home') }}" class="nav-link">Home</a></li>
+                    <li><a href="{{ url_for('game.new_game') }}" class="nav-link">New Game</a></li>
+                    <li><a href="{{ url_for('auth.logout') }}" class="nav-link">Logout</a></li>
+                    <li class="user-welcome">Welcome, {{ current_user.username }}</li>
+                </ul>
+                {% else %}
+                <ul class="nav-list">
+                    <li><a href="{{ url_for('auth.login') }}" class="nav-link">Login</a></li>
+                    <li><a href="{{ url_for('auth.register') }}" class="nav-link">Register</a></li>
+                </ul>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Condorcet Jury Game. All rights reserved.</p>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
